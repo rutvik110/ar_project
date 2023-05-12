@@ -7,11 +7,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-class Dashboard extends ConsumerWidget {
+class Dashboard extends ConsumerStatefulWidget {
   const Dashboard({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<Dashboard> createState() => _DashboardState();
+}
+
+class _DashboardState extends ConsumerState<Dashboard> {
+  @override
+  Widget build(
+    BuildContext context,
+  ) {
     final user = FirebaseAuth.instance.currentUser;
     final alphabets = ref
             .read(sharedPreferancesProvider)
@@ -114,25 +121,27 @@ class Dashboard extends ConsumerWidget {
                       ARModelsDisplayGrid(
                         completedModels: alphabets,
                         arModels: alphabetModels,
-                        onTap: (model) {
-                          Navigator.of(context)
+                        onTap: (model) async {
+                          await Navigator.of(context)
                               .push(MaterialPageRoute(builder: (context) {
                             return ExternalModelManagementWidget(
                               arModel: model,
                             );
                           }));
+                          setState(() {});
                         },
                       ),
                       ARModelsDisplayGrid(
                         completedModels: numbers,
                         arModels: numberModels,
-                        onTap: (model) {
-                          Navigator.of(context)
+                        onTap: (model) async {
+                          await Navigator.of(context)
                               .push(MaterialPageRoute(builder: (context) {
                             return ExternalModelManagementWidget(
                               arModel: model,
                             );
                           }));
+                          setState(() {});
                         },
                       ),
                     ],
