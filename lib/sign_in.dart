@@ -1,11 +1,9 @@
 import 'package:collegearproject/dashboard.dart';
 import 'package:collegearproject/providers.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_ui_auth/firebase_ui_auth.dart';
 import 'package:firebase_ui_oauth_google/firebase_ui_oauth_google.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthViewWrapper extends ConsumerWidget {
   const AuthViewWrapper({super.key});
@@ -40,33 +38,17 @@ class SignInDialog extends ConsumerWidget {
     return Scaffold(
       body: Center(
         child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                  onPressed: () async {
-                    final googleUser = await GoogleSignIn().signIn();
-                    if (googleUser == null) return;
-
-                    // Obtain the auth details from the request
-                    final googleAuth = await googleUser.authentication;
-
-                    // Create a new credential
-                    final credential = GoogleAuthProvider.credential(
-                      accessToken: googleAuth.accessToken,
-                      idToken: googleAuth.idToken,
-                    );
-
-                    // Once signed in, return the UserCredential
-                    await FirebaseAuth.instance
-                        .signInWithCredential(credential);
-                  },
-                  child: const Text("Sign in with Google")),
-              OAuthProviderButton(
-                // or any other OAuthProvider
-                provider: GoogleProvider(clientId: ''),
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OAuthProviderButton(
+                  // or any other OAuthProvider
+                  provider: GoogleProvider(clientId: ''),
+                ),
+              ],
+            ),
           ),
         ),
       ),

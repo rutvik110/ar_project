@@ -12,13 +12,15 @@ import 'package:ar_flutter_plugin/models/ar_node.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:collegearproject/dashboard.dart';
+import 'package:collegearproject/providers.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geoflutterfire/geoflutterfire.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:vector_math/vector_math_64.dart' as VectorMath;
 
-class ExternalModelManagementWidget extends StatefulWidget {
+class ExternalModelManagementWidget extends ConsumerStatefulWidget {
   const ExternalModelManagementWidget({
     super.key,
     required this.arModel,
@@ -26,12 +28,12 @@ class ExternalModelManagementWidget extends StatefulWidget {
 
   final ARModel arModel;
   @override
-  _ExternalModelManagementWidgetState createState() =>
+  ConsumerState<ExternalModelManagementWidget> createState() =>
       _ExternalModelManagementWidgetState();
 }
 
 class _ExternalModelManagementWidgetState
-    extends State<ExternalModelManagementWidget> {
+    extends ConsumerState<ExternalModelManagementWidget> {
   // Firebase stuff
   bool _initialized = false;
   bool _error = false;
@@ -53,10 +55,11 @@ class _ExternalModelManagementWidgetState
   bool modelChoiceActive = false;
 
   final AudioPlayer audioPlayer = AudioPlayer();
-
+  late bool isCompleted;
   @override
   void initState() {
     super.initState();
+    isCompleted = widget.arModel.isCompleted;
     selectedModel = AvailableModel(
         widget.arModel.name,
         widget.arModel.assetPath,
@@ -116,7 +119,19 @@ class _ExternalModelManagementWidgetState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Model Display'),
+        title: Row(
+          children: [
+            if (isCompleted)
+              const Icon(
+                Icons.check_circle_rounded,
+                color: Colors.greenAccent,
+              ),
+            const SizedBox(
+              width: 8,
+            ),
+            Text('${widget.arModel.name} Model Display'),
+          ],
+        ),
         // actions: <Widget>[
         //   // IconButton(
         //   //   icon: Icon(Icons.pets),
@@ -172,6 +187,9 @@ class _ExternalModelManagementWidgetState
             alignment: Alignment.bottomRight,
             child: Row(
               children: [
+                const SizedBox(
+                  width: 8,
+                ),
                 ElevatedButton.icon(
                   onPressed: () {
                     playTrack();
@@ -182,7 +200,44 @@ class _ExternalModelManagementWidgetState
                   label: const Text(
                     "Pronounce",
                   ),
-                )
+                ),
+                const SizedBox(
+                  width: 8,
+                ),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final alphabets = ref
+                            .read(sharedPreferancesProvider)
+                            .getStringList(
+                                widget.arModel.modelType == ModelType.alphabet
+                                    ? "alphabetsProgress"
+                                    : "numbersProgress") ??
+                        [];
+
+                    final updatedList = List<String>.from(alphabets);
+                    updatedList.add(widget.arModel.name);
+                    await ref.read(sharedPreferancesProvider).setStringList(
+                        widget.arModel.modelType == ModelType.alphabet
+                            ? "alphabetsProgress"
+                            : "numbersProgress",
+                        updatedList);
+                    setState(() {
+                      isCompleted = true;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(
+                            "🥳 Hooray! You learned a new ${widget.arModel.modelType == ModelType.alphabet ? "word" : "number"}👏")));
+                  },
+                  icon: Icon(
+                    Icons.check_circle_rounded,
+                    color: isCompleted ? Colors.greenAccent : null,
+                  ),
+                  label: Text(
+                    isCompleted
+                        ? "${widget.arModel.modelType == ModelType.alphabet ? "Alphabet" : "Number"} Leanred"
+                        : "Mark As Complete",
+                  ),
+                ),
               ],
             ),
           ),

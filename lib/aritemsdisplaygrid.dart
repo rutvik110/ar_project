@@ -6,8 +6,10 @@ class ARModelsDisplayGrid extends StatelessWidget {
     super.key,
     required this.arModels,
     required this.onTap,
+    required this.completedModels,
   });
   final List<ARModel> arModels;
+  final List<String> completedModels;
 
   final void Function(ARModel model) onTap;
 
@@ -23,31 +25,62 @@ class ARModelsDisplayGrid extends StatelessWidget {
       ),
       itemBuilder: (context, index) {
         final arModel = arModels[index];
+        final isCompleted = completedModels.contains(arModel.name);
         return InkWell(
           onTap: () {
-            onTap(arModel);
+            final arModelfinal = ARModel(
+              name: arModel.name,
+              assetPath: arModel.assetPath,
+              audioPath: arModel.audioPath,
+              modelType: arModel.modelType,
+              isCompleted: isCompleted,
+            );
+            onTap(arModelfinal);
           },
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.5),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, 2),
+          child: Stack(
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: isCompleted ? Colors.green[50] : Colors.blue[50],
+                  border: isCompleted
+                      ? Border.all(color: Colors.green, width: 2)
+                      : Border.all(color: Colors.blue, width: 1),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    isCompleted
+                        ? BoxShadow(
+                            color: Colors.green[200]!,
+                            blurRadius: 5,
+                            offset: const Offset(0, 3),
+                          )
+                        : BoxShadow(
+                            color: Colors.blue[200]!,
+                            blurRadius: 5,
+                            offset: const Offset(0, 3),
+                          ),
+                  ],
                 ),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                arModel.name,
-                style: const TextStyle(
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
+                child: Center(
+                  child: Text(
+                    arModel.name,
+                    style: const TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              if (isCompleted)
+                const Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Icon(
+                      Icons.check_circle_rounded,
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
       },

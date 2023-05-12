@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:ar_flutter_plugin/ar_flutter_plugin.dart';
+import 'package:collegearproject/providers.dart';
 import 'package:collegearproject/sign_in.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   runZonedGuarded<Future<void>>(
@@ -15,7 +17,10 @@ void main() async {
       await Firebase.initializeApp(
           // options: DefaultFirebaseOptions.currentPlatform,
           );
-      runApp(const ProviderScope(child: MyApp()));
+      final sharedPreferance = await SharedPreferences.getInstance();
+      runApp(ProviderScope(overrides: [
+        sharedPreferancesProvider.overrideWithValue(sharedPreferance),
+      ], child: const MyApp()));
     },
     (Object error, StackTrace stack) async {
       return FirebaseCrashlytics.instance.recordError(error, stack);
