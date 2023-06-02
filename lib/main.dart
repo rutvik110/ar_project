@@ -18,9 +18,14 @@ void main() async {
           // options: DefaultFirebaseOptions.currentPlatform,
           );
       final sharedPreferance = await SharedPreferences.getInstance();
-      runApp(ProviderScope(overrides: [
-        sharedPreferancesProvider.overrideWithValue(sharedPreferance),
-      ], child: const MyApp()));
+      runApp(
+        ProviderScope(
+          overrides: [
+            sharedPreferancesProvider.overrideWithValue(sharedPreferance),
+          ],
+          child: const MyApp(),
+        ),
+      );
     },
     (Object error, StackTrace stack) async {
       return FirebaseCrashlytics.instance.recordError(error, stack);

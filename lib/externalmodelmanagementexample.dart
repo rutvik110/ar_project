@@ -13,6 +13,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:collegearproject/dashboard.dart';
 import 'package:collegearproject/providers.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,12 +29,10 @@ class ExternalModelManagementWidget extends ConsumerStatefulWidget {
 
   final ARModel arModel;
   @override
-  ConsumerState<ExternalModelManagementWidget> createState() =>
-      _ExternalModelManagementWidgetState();
+  ConsumerState<ExternalModelManagementWidget> createState() => _ExternalModelManagementWidgetState();
 }
 
-class _ExternalModelManagementWidgetState
-    extends ConsumerState<ExternalModelManagementWidget> {
+class _ExternalModelManagementWidgetState extends ConsumerState<ExternalModelManagementWidget> {
   // Firebase stuff
   bool _initialized = false;
   bool _error = false;
@@ -56,10 +55,12 @@ class _ExternalModelManagementWidgetState
 
   final AudioPlayer audioPlayer = AudioPlayer();
   late bool isCompleted;
+  bool isFavourite = false;
   @override
   void initState() {
     super.initState();
     isCompleted = widget.arModel.isCompleted;
+    isFavourite = widget.arModel.isFavourite;
     selectedModel = AvailableModel(
         widget.arModel.name,
         widget.arModel.assetPath,
@@ -86,6 +87,8 @@ class _ExternalModelManagementWidgetState
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     // Show error message if initialization failed
     if (_error) {
       return Scaffold(
@@ -96,8 +99,7 @@ class _ExternalModelManagementWidgetState
             child: Column(
               children: [
                 const Text("Firebase initialization failed"),
-                ElevatedButton(
-                    child: const Text("Retry"), onPressed: () => {initState()})
+                ElevatedButton(child: const Text("Retry"), onPressed: () => {initState()})
               ],
             ),
           ));
@@ -110,11 +112,8 @@ class _ExternalModelManagementWidgetState
             title: const Text('External Model Management'),
           ),
           body: Container(
-              child: Center(
-                  child: Column(children: const [
-            CircularProgressIndicator(),
-            Text("Initializing Firebase")
-          ]))));
+              child:
+                  Center(child: Column(children: const [CircularProgressIndicator(), Text("Initializing Firebase")]))));
     }
 
     return Scaffold(
@@ -180,9 +179,7 @@ class _ExternalModelManagementWidgetState
               alignment: FractionalOffset.centerLeft,
               child: Visibility(
                   visible: modelChoiceActive,
-                  child: ModelSelectionWidget(
-                      onTap: onModelSelected,
-                      firebaseManager: firebaseManager))),
+                  child: ModelSelectionWidget(onTap: onModelSelected, firebaseManager: firebaseManager))),
           Align(
             alignment: Alignment.bottomRight,
             child: Row(
@@ -201,25 +198,40 @@ class _ExternalModelManagementWidgetState
                     "Pronounce",
                   ),
                 ),
+                IconButton(
+                  onPressed: () async {
+                    final alphabets =
+                        ref.read(sharedPreferancesProvider).getStringList("${user!.uid}_favourites") ?? [];
+
+                    final updatedList = List<String>.from(alphabets);
+                    updatedList.add(widget.arModel.name);
+                    await ref.read(sharedPreferancesProvider).setStringList("${user.uid}_favourites", updatedList);
+                    setState(() {
+                      isFavourite = true;
+                    });
+                  },
+                  icon: Icon(
+                    isFavourite ? Icons.favorite : Icons.favorite_border,
+                    color: isFavourite ? Colors.red : Colors.white,
+                  ),
+                ),
                 const SizedBox(
                   width: 8,
                 ),
                 ElevatedButton.icon(
                   onPressed: () async {
-                    final alphabets = ref
-                            .read(sharedPreferancesProvider)
-                            .getStringList(
-                                widget.arModel.modelType == ModelType.alphabet
-                                    ? "alphabetsProgress"
-                                    : "numbersProgress") ??
+                    final alphabets = ref.read(sharedPreferancesProvider).getStringList(
+                            widget.arModel.modelType == ModelType.alphabet
+                                ? "${user!.uid}_alphabetsProgress"
+                                : "${user!.uid}_numbersProgress") ??
                         [];
 
                     final updatedList = List<String>.from(alphabets);
                     updatedList.add(widget.arModel.name);
                     await ref.read(sharedPreferancesProvider).setStringList(
                         widget.arModel.modelType == ModelType.alphabet
-                            ? "alphabetsProgress"
-                            : "numbersProgress",
+                            ? "${user.uid}_alphabetsProgress"
+                            : "${user.uid}_numbersProgress",
                         updatedList);
                     setState(() {
                       isCompleted = true;
@@ -271,10 +283,7 @@ class _ExternalModelManagementWidgetState
     arAnchorManager.onAnchorUploaded = onAnchorUploaded;
     arAnchorManager.onAnchorDownloaded = onAnchorDownloaded;
 
-    arLocationManager
-        .startLocationUpdates()
-        .then((value) => null)
-        .onError((error, stackTrace) {
+    arLocationManager.startLocationUpdates().then((value) => null).onError((error, stackTrace) {
       switch (error.toString()) {
         case 'Location services disabled':
           {
@@ -349,17 +358,14 @@ class _ExternalModelManagementWidgetState
   }
 
   Future<void> onNodeTapped(List<String> nodeNames) async {
-    var foregroundNode =
-        nodes.firstWhere((element) => element.name == nodeNames.first);
+    var foregroundNode = nodes.firstWhere((element) => element.name == nodeNames.first);
     arSessionManager.onError(foregroundNode.data?["onTapText"]);
   }
 
-  Future<void> onPlaneOrPointTapped(
-      List<ARHitTestResult> hitTestResults) async {
-    var singleHitTestResult = hitTestResults.firstWhere(
-        (hitTestResult) => hitTestResult.type == ARHitTestResultType.plane);
-    var newAnchor = ARPlaneAnchor(
-        transformation: singleHitTestResult.worldTransform, ttl: 2);
+  Future<void> onPlaneOrPointTapped(List<ARHitTestResult> hitTestResults) async {
+    var singleHitTestResult =
+        hitTestResults.firstWhere((hitTestResult) => hitTestResult.type == ARHitTestResultType.plane);
+    var newAnchor = ARPlaneAnchor(transformation: singleHitTestResult.worldTransform, ttl: 2);
     bool? didAddAnchor = await arAnchorManager.addAnchor(newAnchor);
     if (didAddAnchor != null && didAddAnchor) {
       anchors.add(newAnchor);
@@ -371,8 +377,7 @@ class _ExternalModelManagementWidgetState
           position: VectorMath.Vector3(0.0, 0.0, 0.0),
           rotation: VectorMath.Vector4(1.0, 0.0, 0.0, 0.0),
           data: {"onTapText": "I am a ${selectedModel.name}"});
-      bool? didAddNodeToAnchor =
-          await arObjectManager.addNode(newNode, planeAnchor: newAnchor);
+      bool? didAddNodeToAnchor = await arObjectManager.addNode(newNode, planeAnchor: newAnchor);
       if (didAddNodeToAnchor != null && didAddNodeToAnchor) {
         nodes.add(newNode);
         setState(() {
@@ -399,8 +404,7 @@ class _ExternalModelManagementWidgetState
     // Upload child nodes to firebase
     if (anchor is ARPlaneAnchor) {
       for (var nodeName in anchor.childNodes) {
-        firebaseManager.uploadObject(
-            nodes.firstWhere((element) => element.name == nodeName));
+        firebaseManager.uploadObject(nodes.firstWhere((element) => element.name == nodeName));
       }
     }
     setState(() {
@@ -413,8 +417,7 @@ class _ExternalModelManagementWidgetState
   ARAnchor onAnchorDownloaded(Map<String, dynamic> serializedAnchor) {
     final data = anchorsInDownloadProgress[serializedAnchor["cloudanchorid"]]!;
 
-    final anchor = ARPlaneAnchor.fromJson(
-        Map.castFrom<dynamic, dynamic, String, dynamic>(data));
+    final anchor = ARPlaneAnchor.fromJson(Map.castFrom<dynamic, dynamic, String, dynamic>(data));
     anchorsInDownloadProgress.remove(anchor.cloudanchorid);
     anchors.add(anchor);
 
@@ -444,21 +447,19 @@ class _ExternalModelManagementWidgetState
     if (arLocationManager.currentLocation != null) {
       firebaseManager.downloadAnchorsByLocation((snapshot) {
         final cloudAnchorId = snapshot.get("cloudanchorid");
-        anchorsInDownloadProgress[cloudAnchorId] =
-            snapshot.data()! as Map<String, dynamic>;
+        anchorsInDownloadProgress[cloudAnchorId] = snapshot.data()! as Map<String, dynamic>;
         arAnchorManager.downloadAnchor(cloudAnchorId);
       }, arLocationManager.currentLocation, 0.1);
       setState(() {
         readyToDownload = false;
       });
     } else {
-      arSessionManager
-          .onError("Location updates not running, can't download anchors");
+      arSessionManager.onError("Location updates not running, can't download anchors");
     }
   }
 
-  void showAlertDialog(BuildContext context, String title, String content,
-      String buttonText, Function buttonFunction, String cancelButtonText) {
+  void showAlertDialog(BuildContext context, String title, String content, String buttonText, Function buttonFunction,
+      String cancelButtonText) {
     // set up the buttons
     Widget cancelButton = ElevatedButton(
       child: Text(cancelButtonText),
@@ -496,8 +497,7 @@ class _ExternalModelManagementWidgetState
 
 // Class for managing interaction with Firebase (in your own app, this can be put in a separate file to keep everything clean and tidy)
 typedef FirebaseListener = void Function(QuerySnapshot snapshot);
-typedef FirebaseDocumentStreamListener = void Function(
-    DocumentSnapshot snapshot);
+typedef FirebaseDocumentStreamListener = void Function(DocumentSnapshot snapshot);
 
 class FirebaseManager {
   late FirebaseFirestore firestore;
@@ -526,19 +526,15 @@ class FirebaseManager {
     if (firestore == null) return;
 
     var serializedAnchor = anchor.toJson();
-    var expirationTime = DateTime.now().millisecondsSinceEpoch / 1000 +
-        serializedAnchor["ttl"] * 24 * 60 * 60;
+    var expirationTime = DateTime.now().millisecondsSinceEpoch / 1000 + serializedAnchor["ttl"] * 24 * 60 * 60;
     serializedAnchor["expirationTime"] = expirationTime;
     // Add location
-    GeoFirePoint myLocation = geo.point(
-        latitude: currentLocation.latitude,
-        longitude: currentLocation.longitude);
+    GeoFirePoint myLocation = geo.point(latitude: currentLocation.latitude, longitude: currentLocation.longitude);
     serializedAnchor["position"] = myLocation.data;
 
     anchorCollection
         .add(serializedAnchor)
-        .then((value) =>
-            print("Successfully added anchor: " + serializedAnchor["name"]))
+        .then((value) => print("Successfully added anchor: " + serializedAnchor["name"]))
         .catchError((error) => print("Failed to add anchor: $error"));
   }
 
@@ -549,8 +545,7 @@ class FirebaseManager {
 
     objectCollection
         .add(serializedNode)
-        .then((value) =>
-            print("Successfully added object: " + serializedNode["name"]))
+        .then((value) => print("Successfully added object: " + serializedNode["name"]))
         .catchError((error) => print("Failed to add object: $error"));
   }
 
@@ -560,18 +555,14 @@ class FirebaseManager {
         .limitToLast(1)
         .get()
         .then((value) => listener(value))
-        .catchError(
-            (error) => (error) => print("Failed to download anchor: $error"));
+        .catchError((error) => (error) => print("Failed to download anchor: $error"));
   }
 
-  void downloadAnchorsByLocation(FirebaseDocumentStreamListener listener,
-      Position location, double radius) {
-    GeoFirePoint center =
-        geo.point(latitude: location.latitude, longitude: location.longitude);
+  void downloadAnchorsByLocation(FirebaseDocumentStreamListener listener, Position location, double radius) {
+    GeoFirePoint center = geo.point(latitude: location.latitude, longitude: location.longitude);
 
-    Stream<List<DocumentSnapshot>> stream = geo
-        .collection(collectionRef: anchorCollection)
-        .within(center: center, radius: radius, field: 'position');
+    Stream<List<DocumentSnapshot>> stream =
+        geo.collection(collectionRef: anchorCollection).within(center: center, radius: radius, field: 'position');
 
     stream.listen((List<DocumentSnapshot> documentList) {
       for (var element in documentList) {
@@ -593,16 +584,12 @@ class FirebaseManager {
   void deleteExpiredDatabaseEntries() {
     WriteBatch batch = FirebaseFirestore.instance.batch();
     anchorCollection
-        .where("expirationTime",
-            isLessThan: DateTime.now().millisecondsSinceEpoch / 1000)
+        .where("expirationTime", isLessThan: DateTime.now().millisecondsSinceEpoch / 1000)
         .get()
         .then((anchorSnapshot) => anchorSnapshot.docs.forEach((anchorDoc) {
               // Delete all objects attached to the expired anchor
-              objectCollection
-                  .where("name", arrayContainsAny: anchorDoc.get("childNodes"))
-                  .get()
-                  .then((objectSnapshot) => objectSnapshot.docs.forEach(
-                      (objectDoc) => batch.delete(objectDoc.reference)));
+              objectCollection.where("name", arrayContainsAny: anchorDoc.get("childNodes")).get().then(
+                  (objectSnapshot) => objectSnapshot.docs.forEach((objectDoc) => batch.delete(objectDoc.reference)));
               // Delete the expired anchor
               batch.delete(anchorDoc.reference);
             }));
@@ -628,8 +615,7 @@ class ModelSelectionWidget extends StatefulWidget {
   final Function onTap;
   final FirebaseManager firebaseManager;
 
-  const ModelSelectionWidget(
-      {super.key, required this.onTap, required this.firebaseManager});
+  const ModelSelectionWidget({super.key, required this.onTap, required this.firebaseManager});
 
   @override
   _ModelSelectionWidgetState createState() => _ModelSelectionWidgetState();
@@ -644,8 +630,8 @@ class _ModelSelectionWidgetState extends State<ModelSelectionWidget> {
     widget.firebaseManager.downloadAvailableModels((snapshot) {
       for (var element in snapshot.docs) {
         setState(() {
-          models.add(AvailableModel(element.get("name"), element.get("uri"),
-              element.get("image").first["downloadURL"]));
+          models
+              .add(AvailableModel(element.get("name"), element.get("uri"), element.get("image").first["downloadURL"]));
         });
       }
     });
@@ -675,10 +661,7 @@ class _ModelSelectionWidgetState extends State<ModelSelectionWidget> {
                 )
               ],
             ),
-            child: Text('Choose a Model',
-                style: DefaultTextStyle.of(context)
-                    .style
-                    .apply(fontSizeFactor: 2.0)),
+            child: Text('Choose a Model', style: DefaultTextStyle.of(context).style.apply(fontSizeFactor: 2.0)),
           ),
           SizedBox(
             height: MediaQuery.of(context).size.width * 0.65,
@@ -699,14 +682,10 @@ class _ModelSelectionWidgetState extends State<ModelSelectionWidget> {
                     ),
                     child: Column(
                       children: [
-                        Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Image.network(models[index].image)),
+                        Padding(padding: const EdgeInsets.all(20), child: Image.network(models[index].image)),
                         Text(
                           models[index].name,
-                          style: DefaultTextStyle.of(context)
-                              .style
-                              .apply(fontSizeFactor: 2.0),
+                          style: DefaultTextStyle.of(context).style.apply(fontSizeFactor: 2.0),
                         )
                       ],
                     ),

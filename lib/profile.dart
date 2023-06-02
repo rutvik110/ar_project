@@ -9,13 +9,8 @@ class UserProfile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = FirebaseAuth.instance.currentUser!;
-    final alphabets = ref
-            .read(sharedPreferancesProvider)
-            .getStringList("alphabetsProgress") ??
-        [];
-    final numbers =
-        ref.read(sharedPreferancesProvider).getStringList("numbersProgress") ??
-            [];
+    final alphabets = ref.read(sharedPreferancesProvider).getStringList("${user.uid}_alphabetsProgress") ?? [];
+    final numbers = ref.read(sharedPreferancesProvider).getStringList("${user.uid}_numbersProgress") ?? [];
     return Scaffold(
       appBar: AppBar(
         title: const Text("Profile"),
